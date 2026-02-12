@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64 Pro - Secure Local-First Toolbox</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <style>
+        :root {
+            --p: #6366f1;
+            --s: #10b981;
+            --warn: #f59e0b;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --border: #334155;
+        }
+
+        * { box-sizing: border-box; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .wrapper {
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+        }
+
+        h1 { font-size: 1.5rem; margin: 0; color: var(--p); display: flex; align-items: center; gap: 10px; }
+
+        .controls { display: flex; gap: 12px; align-items: center; }
+
+        select {
+            background: var(--card);
+            color: white;
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            background: var(--card);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--p);
+            background: #1e293b;
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.1);
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 900px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+
+        textarea {
+            width: 100%;
+            height: 380px;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #34d399;
+            padding: 16px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+        }
+
+        textarea:focus { border-color: var(--p); }
+
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary { background: var(--p); color: white; }
+        .btn-success { background: var(--s); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: #94a3b8; }
+        button:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .info-bar {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--p);
+            font-size: 12px;
+        }
+
+        .info-val { font-family: monospace; color: var(--warn); word-break: break-all; margin-top: 4px; }
+
+        .pwa-badge {
+            background: #334155;
+            color: #94a3b8;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <header>
+        <h1>🚀 Base64 Pro <span class="pwa-badge" id="offline-tag">ONLINE</span></h1>
+        <div class="controls">
+            <select id="langSelect" onchange="changeLang(this.value)">
+                <option value="zh">简体中文</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </header>
+
+    <div class="drop-zone" id="dropZone">
+        <span id="t-drop-text">📁 拖拽任何文件在此处自动转换为 Base64</span>
+        <input type="file" id="fileInput" hidden>
+    </div>
+
+    <div class="main-grid">
+        <!-- 左侧：明文区 -->
+        <div class="panel">
+            <div class="label-row">
+                <span id="t-raw-label">原始数据 / 明文</span>
+                <span id="raw-size">0 bytes</span>
+            </div>
+            <textarea id="rawInput" placeholder="在此输入普通文本..."></textarea>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="encodeB64()" id="t-btn-enc">Base64 编码</button>
+                <button class="btn-success" onclick="encryptAES()" id="t-btn-aes-enc">AES 加密</button>
+                <button class="btn-outline" onclick="clearAll()" id="t-btn-clear">清空</button>
+            </div>
+            <div class="info-bar">
+                <div id="t-hash-label">SHA-256 指纹:</div>
+                <div id="hashDisplay" class="info-val">-</div>
+            </div>
+        </div>
+
+        <!-- 右侧：密文区 -->
+        <div class="panel">
+            <div class="label-row">
+                <span id="t-b64-label">Base64 / 密文输出</span>
+                <span id="b64-size">0 bytes</span>
+            </div>
+            <textarea id="b64Input" placeholder="在此粘贴 Base64 字符串..."></textarea>
+            <div class="btn-group">
+                <button class="btn-primary" onclick="decodeB64()" id="t-btn-dec">Base64 解码</button>
+                <button class="btn-success" onclick="decryptAES()" id="t-btn-aes-dec">AES 解密</button>
+                <button class="btn-outline" onclick="downloadFile()" id="t-btn-save">保存文件</button>
+                <button class="btn-outline" onclick="copyResult()" id="t-btn-copy">复制</button>
+            </div>
+            <div class="info-bar">
+                <div id="t-crypto-note">算法标准: AES-GCM 256-bit</div>
+                <div class="info-val" style="color: #64748b;" id="t-crypto-desc">PBKDF2 100k 迭代派生密钥</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const $ = id => document.getElementById(id);
+    const i18n = {
+        zh: {
+            dropText: "📁 拖拽任何文件在此处自动转换为 Base64",
+            rawLabel: "原始数据 / 明文",
+            b64Label: "Base64 / 密文输出",
+            btnEnc: "Base64 编码",
+            btnDec: "Base64 解码",
+            btnAesEnc: "AES 加密",
+            btnAesDec: "AES 解密",
+            btnClear: "清空",
+            btnSave: "保存文件",
+            btnCopy: "复制",
+            hashLabel: "SHA-256 指纹:",
+            cryptoNote: "算法标准: AES-GCM 256-bit",
+            cryptoDesc: "PBKDF2 100k 迭代派生密钥",
+            promptPw: "请输入密钥 (用于派生 256 位 AES 密钥):",
+            errDec: "解密失败：密码错误或数据格式不正确",
+            offline: "🔒 离线模式",
+            online: "🌐 在线模式"
+        },
+        en: {
+            dropText: "📁 Drag & Drop any file here to convert to Base64",
+            rawLabel: "Raw Data / Plaintext",
+            b64Label: "Base64 / Output",
+            btnEnc: "Base64 Encode",
+            btnDec: "Base64 Decode",
+            btnAesEnc: "AES Encrypt",
+            btnAesDec: "AES Decrypt",
+            btnClear: "Clear",
+            btnSave: "Save File",
+            btnCopy: "Copy",
+            hashLabel: "SHA-256 Fingerprint:",
+            cryptoNote: "Standard: AES-GCM 256-bit",
+            cryptoDesc: "PBKDF2 100k Iterations",
+            promptPw: "Enter secret key (for 256-bit AES derivation):",
+            errDec: "Decryption failed: wrong password or invalid data",
+            offline: "🔒 OFFLINE",
+            online: "🌐 ONLINE"
+        }
+    };
+
+    let currentLang = localStorage.getItem('b64_lang') || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+
+    function changeLang(lang) {
+        currentLang = lang;
+        localStorage.setItem('b64_lang', lang);
+        $('langSelect').value = lang;
+        const t = i18n[lang];
+        $('t-drop-text').innerText = t.dropText;
+        $('t-raw-label').innerText = t.rawLabel;
+        $('t-b64-label').innerText = t.b64Label;
+        $('t-btn-enc').innerText = t.btnEnc;
+        $('t-btn-dec').innerText = t.btnDec;
+        $('t-btn-aes-enc').innerText = t.btnAesEnc;
+        $('t-btn-aes-dec').innerText = t.btnAesDec;
+        $('t-btn-clear').innerText = t.btnClear;
+        $('t-btn-save').innerText = t.btnSave;
+        $('t-btn-copy').innerText = t.btnCopy;
+        $('t-hash-label').innerText = t.hashLabel;
+        $('t-crypto-note').innerText = t.cryptoNote;
+        $('t-crypto-desc').innerText = t.cryptoDesc;
+        updateOfflineTag();
+    }
+
+    function updateOfflineTag() {
+        const tag = $('offline-tag');
+        if (navigator.onLine) {
+            tag.innerText = i18n[currentLang].online;
+            tag.style.color = "#94a3b8";
+        } else {
+            tag.innerText = i18n[currentLang].offline;
+            tag.style.color = "#10b981";
+        }
+    }
+
+    // --- 核心业务逻辑 ---
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    async function encodeB64() {
+        const bytes = encoder.encode($('rawInput').value);
+        let bin = "";
+        for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+        $('b64Input').value = btoa(bin);
+        updateSizes();
+    }
+
+    async function decodeB64() {
+        try {
+            const bin = atob($('b64Input').value.replace(/\s/g, ''));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            $('rawInput').value = decoder.decode(bytes);
+            updateSizes();
+        } catch(e) { alert("Invalid Base64"); }
+    }
+
+    async function getCryptoKey(password) {
+        const pwBytes = encoder.encode(password);
+        const salt = encoder.encode("b64pro-salt-fixed");
+        const baseKey = await crypto.subtle.importKey("raw", pwBytes, "PBKDF2", false, ["deriveKey"]);
+        return crypto.subtle.deriveKey(
+            { name: "PBKDF2", salt, iterations: 100000, hash: "SHA-256" },
+            baseKey, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+        );
+    }
+
+    async function encryptAES() {
+        const pw = prompt(i18n[currentLang].promptPw);
+        if(!pw) return;
+        const key = await getCryptoKey(pw);
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode($('rawInput').value));
+        const combined = new Uint8Array(iv.length + encrypted.byteLength);
+        combined.set(iv);
+        combined.set(new Uint8Array(encrypted), 12);
+        $('b64Input').value = btoa(String.fromCharCode(...combined));
+        updateSizes();
+    }
+
+    async function decryptAES() {
+        const pw = prompt(i18n[currentLang].promptPw);
+        if(!pw) return;
+        try {
+            const data = Uint8Array.from(atob($('b64Input').value), c => c.charCodeAt(0));
+            const iv = data.slice(0, 12);
+            const cypher = data.slice(12);
+            const key = await getCryptoKey(pw);
+            const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, cypher);
+            $('rawInput').value = decoder.decode(decrypted);
+            updateSizes();
+        } catch(e) { alert(i18n[currentLang].errDec); }
+    }
+
+    // --- 实用工具 ---
+    async function updateHash() {
+        const val = $('rawInput').value;
+        if(!val) { $('hashDisplay').innerText = "-"; return; }
+        const buf = await crypto.subtle.digest('SHA-256', encoder.encode(val));
+        $('hashDisplay').innerText = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    function updateSizes() {
+        $('raw-size').innerText = new Blob([$('rawInput').value]).size + " bytes";
+        $('b64-size').innerText = $('b64Input').value.length + " chars";
+    }
+
+    $('rawInput').oninput = () => { updateHash(); updateSizes(); };
+    $('b64Input').oninput = updateSizes;
+
+    function copyResult() {
+        $('b64Input').select();
+        document.execCommand('copy');
+    }
+
+    function clearAll() {
+        $('rawInput').value = $('b64Input').value = "";
+        updateHash(); updateSizes();
+    }
+
+    function downloadFile() {
+        const val = $('b64Input').value.trim();
+        if(!val) return;
+        const link = document.createElement('a');
+        link.href = val.startsWith('data:') ? val : 'data:application/octet-stream;base64,' + val;
+        link.download = "b64_pro_export_" + Date.now();
+        link.click();
+    }
+
+    // --- 拖拽处理 ---
+    const dz = $('dropZone');
+    dz.onclick = () => $('fileInput').click();
+    $('fileInput').onchange = e => handleFile(e.target.files[0]);
+    dz.ondragover = e => { e.preventDefault(); dz.classList.add('dragover'); };
+    dz.ondragleave = () => dz.classList.remove('dragover');
+    dz.ondrop = e => {
+        e.preventDefault();
+        dz.classList.remove('dragover');
+        handleFile(e.dataTransfer.files[0]);
+    };
+
+    function handleFile(file) {
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            $('b64Input').value = e.target.result;
+            $('rawInput').value = `[Loaded File: ${file.name} / ${file.type}]`;
+            updateSizes();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // --- PWA & 初始化 ---
+    window.addEventListener('online', updateOfflineTag);
+    window.addEventListener('offline', updateOfflineTag);
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+
+    changeLang(currentLang);
+</script>
+</body>
+</html>
